@@ -2,6 +2,7 @@
 
 /* eslint-disable id-length, no-console, no-process-env, no-sync, no-process-exit */
 const fs = require('fs')
+const path = require('path');
 const { log } = console
 const XmlStream = require('xml-stream')
 const parseDate = require('./lib/parseDate')
@@ -134,8 +135,9 @@ async function main () {
   const stream = await readFile(filename)
   const output = await buildJSONfromStream(stream)
   const transformStream = ndjson.stringify();
+  const target = path.join(__dirname, '..', 'data.ndjson')
   const outputStream = transformStream.pipe(
-    fs.createWriteStream( __dirname + "/data.ndjson" ) );
+    fs.createWriteStream(target) );
   output.forEach(document => {
     transformStream.write(document)
   })
@@ -144,7 +146,7 @@ async function main () {
   outputStream.on(
     "finish",
     function handleFinish() {
-      console.log(`dumped to ${ __dirname}/data.ndjson!`);
+      console.log(`dumped to ${target}!`);
     }
   )
 
