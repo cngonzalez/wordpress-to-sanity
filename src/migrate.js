@@ -7,6 +7,8 @@ const XmlStream = require('xml-stream')
 const parseDate = require('./lib/parseDate')
 const parseBody = require('./lib/parseBody')
 const slugify = require('slugify')
+const ndjson = require('ndjson');
+
 function generateAuthorId (id) {
   return `author-${id}`
 }
@@ -39,13 +41,17 @@ async function buildJSONfromStream (stream) {
      */
     const categories = []
     xml.on('endElement: category', wpCategory => {
-      const { nicename } = wpCategory.$
-      const category = {
-        _type: 'category',
-        _id: generateCategoryId(nicename),
-        title: nicename
+      try {
+        const { nicename } = wpCategory.$
+        const category = {
+          _type: 'category',
+          _id: generateCategoryId(nicename),
+          title: nicename
+        }
+        categories.push(category)
+      } catch(e) {
+        console.log('category error', e)
       }
-      categories.push(category)
     })
 
     /**
@@ -53,6 +59,7 @@ async function buildJSONfromStream (stream) {
      */
     const users = []
     xml.on('endElement: wp:author', author => {
+      try {
       const user = {
         _type: 'author',
         _id: generateAuthorId(author['wp:author_id']),
@@ -63,38 +70,46 @@ async function buildJSONfromStream (stream) {
         email: author['wp:author_email']
       }
       users.push(user)
-    })
 
+      } catch (e) {
+        console.log('author error', e)
+      }
+    })
     /**
      * Get the posts
      */
     const posts = []
     xml.collect('wp:postmeta')
     xml.on('endElement: item', item => {
-      const { title, category, link: permalink, description } = item
-      if (item['wp:post_type'] != 'post' && item['wp:post_type'] != 'page') { return }
-      const post = {
-        _type: 'post',
-        title,
-        slug: {
-          current: slugify(title, { lower: true })
-        },
-        categories: [
-          {
+      try {
+        const { title, category, link: permalink, description } = item
+        if (item['wp:post_type'] != 'post' && item['wp:post_type'] != 'post') { return }
+        const post = {
+          _type: 'post',
+          title,
+          slug: {
+            current: slugify(title, { lower: true })
+          },
+          categories: [
+            {
+              _type: 'reference',
+              _ref: generateCategoryId(category.$.nicename)
+            }
+          ],
+          description,
+          body: parseBody(item['content:encoded']),
+          publishedAt: (item['wp:post_date_gmt'] || item['wp:post_date']) ? parseDate(item) : ''
+          /* author: {
             _type: 'reference',
-            _ref: generateCategoryId(category.$.nicename)
-          }
-        ],
-        description,
-        body: parseBody(item['content:encoded']),
-        publishedAt: parseDate(item)
-        /* author: {
-          _type: 'reference',
-          _ref: users.find(user => user.slug.current === item['dc:creator'])._id
-        },
-        */
+            _ref: users.find(user => user.slug.current === item['dc:creator'])._id
+          },
+          */
+        }
+        posts.push(post)
+      } catch(e) {
+        console.log('post error', e)
       }
-      posts.push(post)
+
     })
 
     // there seems to be a bug where errors is not caught
@@ -109,17 +124,30 @@ async function buildJSONfromStream (stream) {
         ...posts,
         ...categories
       ]
-
       return res(output)
     })
   })
 }
 
 async function main () {
-  const filename = './exampleData/alexoglou.xml'
+  const filename = './example.xml'
   const stream = await readFile(filename)
   const output = await buildJSONfromStream(stream)
-  output.forEach(doc => log(JSON.stringify(doc, null, 0)))
+  const transformStream = ndjson.stringify();
+  const outputStream = transformStream.pipe(
+    fs.createWriteStream( __dirname + "/data.ndjson" ) );
+  output.forEach(document => {
+    transformStream.write(document)
+  })
+
+  transformStream.end();
+  outputStream.on(
+    "finish",
+    function handleFinish() {
+      console.log(`dumped to ${ __dirname}/data.ndjson!`);
+    }
+  )
+
 }
 
 main()

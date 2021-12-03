@@ -4,7 +4,8 @@
   "description": "",
   "main": "index.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "start": "node src/migrate.js"
   },
   "author": "",
   "license": "ISC",
@@ -15,6 +16,7 @@
     "@sanity/schema": "^1.149.4",
     "cheerio": "^1.0.0-rc.3",
     "jsdom": "^16.2.2",
+    "ndjson": "^2.0.0",
     "sanitize-html": "^1.22.1",
     "slugify": "^1.4.0",
     "xml-stream": "^0.4.5"

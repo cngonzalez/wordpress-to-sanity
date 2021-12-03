@@ -60,3 +60,6 @@ typings/
 # Lockfiles
 yarn.lock
 package-lock.json
+
+*.xml
+*.ndjson
