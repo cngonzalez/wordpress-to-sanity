@@ -46,12 +46,16 @@ function htmlToBlocks (html, options) {
       },
       {
         deserialize (el, next, block) {
-          if (el.tagName === 'IMG') {
+          const validImgTest = (src) => {
+            const httpReg = /^http/
+            return httpReg.test(src)
+          }
+          if (el.tagName === 'IMG' && el.getAttribute('src') && validImgTest(el.getAttribute('src'))) {
             return block({
                 children: [],
                 _sanityAsset: `image@${el
                   .getAttribute('src')
-                  .replace(/^\/\//, 'https://')}`
+                  .replace(/^\//, 'https://')}`
             })
           }
 
@@ -61,6 +65,7 @@ function htmlToBlocks (html, options) {
             el.childNodes.tagName &&
             el.childNodes[0].tagName.toLowerCase() === 'img'
           ) {
+            console.log(el.childNodes[0])
             return block({
                 _sanityAsset: `image@${el.childNodes[0]
                   .getAttribute('src')

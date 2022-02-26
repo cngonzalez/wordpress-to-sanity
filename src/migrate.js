@@ -9,6 +9,7 @@ const parseDate = require('./lib/parseDate')
 const parseBody = require('./lib/parseBody')
 const slugify = require('slugify')
 const ndjson = require('ndjson');
+const parsePageBody = require('./lib/parsePageBody')
 
 function generateAuthorId (id) {
   return `author-${id}`
@@ -49,7 +50,9 @@ async function buildJSONfromStream (stream) {
           _id: generateCategoryId(nicename),
           title: nicename
         }
-        categories.push(category)
+        if (!categories.find(cat => cat._id == category._id)) {
+          categories.push(category)
+        }
       } catch(e) {
         console.log('category error', e)
       }
@@ -79,14 +82,13 @@ async function buildJSONfromStream (stream) {
     /**
      * Get the posts
      */
-    const posts = []
+    const pages = []
     xml.collect('wp:postmeta')
     xml.on('endElement: item', item => {
       try {
         const { title, category, link: permalink, description } = item
-        if (item['wp:post_type'] != 'post' && item['wp:post_type'] != 'post') { return }
-        const post = {
-          _type: 'post',
+        const page = {
+          _type: 'page',
           title,
           slug: {
             current: slugify(title, { lower: true })
@@ -98,17 +100,12 @@ async function buildJSONfromStream (stream) {
             }
           ],
           description,
-          body: parseBody(item['content:encoded']),
-          publishedAt: (item['wp:post_date_gmt'] || item['wp:post_date']) ? parseDate(item) : ''
-          /* author: {
-            _type: 'reference',
-            _ref: users.find(user => user.slug.current === item['dc:creator'])._id
-          },
-          */
+          publishedAt: (item['wp:post_date_gmt'] || item['wp:post_date']) ? parseDate(item) : '',
+          pageBuilder: parsePageBody(item['content:encoded'], title)
         }
-        posts.push(post)
+        pages.push(page)
       } catch(e) {
-        console.log('post error', e)
+        console.log('page error', e)
       }
 
     })
@@ -122,7 +119,7 @@ async function buildJSONfromStream (stream) {
       const output = [
         /* meta, */
         ...users,
-        ...posts,
+        ...pages,
         ...categories
       ]
       return res(output)
